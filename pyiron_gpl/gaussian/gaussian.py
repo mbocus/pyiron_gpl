@@ -436,9 +436,10 @@ def fchk2dict(output_file):
     fchkdict['basis_set']   = fchk.obasis_name
 
     fchkdict['structure/numbers']     = fchk.atnums
+    fchkdict['generic/indices']       = np.arange(len(fchk.atnums)) # needed for animate_structures, an error is encountered otherwise
     fchkdict['structure/masses']      = fchk.atmasses
     fchkdict['structure/charges']     = fchk.atcharges
-    fchkdict['structure/dipole'] = None
+    fchkdict['structure/dipole']      = None
     for key, item in fchk.moments.items():
         if key == (1, 'c'): # dipole moment in cartesian coordinates
             fchkdict['structure/dipole'] = item
