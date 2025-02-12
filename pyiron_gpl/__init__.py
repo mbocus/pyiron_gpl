@@ -5,8 +5,7 @@ from pyiron_atomistics.project import Project
 from pyiron_base import Notebook, install_dialog, JOB_CLASS_DICT
 
 # Make classes available for new pyiron version
-JOB_CLASS_DICT["QuickFF"] = "pyiron_gpl.quickff.quickff"
-JOB_CLASS_DICT["Yaff"] = "pyiron_gpl.yaff.yaff"
+JOB_CLASS_DICT["Gaussian"] = "pyiron_gpl.gaussian.gaussian"
 
 from ._version import get_versions
 
