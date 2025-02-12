@@ -454,10 +454,10 @@ def fchk2dict(output_file):
         fchkdict['structure/dft/beta_orbital_e']  = fchk.mo.energies[fchk.mo.norba:]
 
     # Densities
-    fchkdict['structure/dft/scf_density']           = fchk.one_rdms["scf"]
-    fchkdict['structure/dft/spin_scf_density']      = fchk.one_rdms["scf_spin"]
-    fchkdict['structure/dft/post_scf_density']      = fchk.one_rdms["post_scf_ao"]
-    fchkdict['structure/dft/post_spin_scf_density'] = fchk.one_rdms["post_scf_spin_ao"]
+    fchkdict['structure/dft/scf_density'] = fchk.one_rdms.get("scf", None)
+    fchkdict['structure/dft/spin_scf_density'] = fchk.one_rdms.get("scf_spin", None)
+    fchkdict['structure/dft/post_scf_density'] = fchk.one_rdms.get("post_scf_ao", None)
+    fchkdict['structure/dft/post_spin_scf_density'] = fchk.one_rdms.get("post_scf_spin_ao", None)
 
     fchkdict['structure/positions']   = fchk.atcoords * Bohr
     # Specific job information
