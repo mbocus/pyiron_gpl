@@ -28,13 +28,10 @@ setup(
     keywords='pyiron',
     packages=find_packages(exclude=["*tests*", "*docs*", "*binder*", "*conda*", "*notebooks*", "*.ci_support*"]),
     install_requires=[
-        'molmod==1.4.8',
         'numpy==1.26.4',
-        'pyiron_atomistics==0.6.10',
-        'pyiron_snippets==0.1.3',
-        'quickff==2.2.4',
-        'tamkin==1.2.6',
-        'yaff==1.6.0'
+        'pyiron_atomistics==0.6.22',
+        'pyiron_snippets==0.1.4',
+        'qc-iodata==v1.0.0a5'
     ],
     cmdclass=versioneer.get_cmdclass(),
 

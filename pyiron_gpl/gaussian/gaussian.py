@@ -14,17 +14,14 @@ from pyiron_base import GenericParameters
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_snippets.import_alarm import ImportAlarm
 
+from ase.units import Bohr, Ha
+
 try:
-    from molmod.io.fchk import FCHKFile
-    from molmod.units import amu, angstrom, electronvolt, centimeter, kcalmol
-    from molmod.constants import lightspeed
-    from molmod.periodic import periodic
-    import tamkin
+    from iodata import load_one, load_many
     import_alarm = ImportAlarm()
 except ImportError:
     import_alarm = ImportAlarm(
-        "Gaussian relies on the molmod and tamkin packages, but these are unavailable. Please ensure your python "
-        "environment contains these."
+        "Gaussian relies on the IOData package, but this is unavailable. Please ensure your python environment contains it."
     )
 
 
@@ -231,7 +228,7 @@ class Gaussian(GenericDFTJob):
         try:
             import nglview
         except ImportError:
-            raise ImportError("The animate_nma_mode() function requires the package nglview to be installed")
+            raise ImportError("The visualize_MO() function requires the package nglview to be installed")
 
         atom_numbers = []
         atom_positions = []
@@ -330,7 +327,7 @@ class GaussianInput(GenericParameters):
         """
         input_str = """\
 lot HF
-basis_set 6-311G(d,p)
+basis_set sto-3g
 spin_mult 1
 charge 0
 """
@@ -422,63 +419,63 @@ def write_input(input_dict,working_directory='.'):
             f.write('\n\n') # don't know whether this is still necessary in G16
 
 
-# we could use theochem iodata, should be more robust than molmod.io
-# but we require the latest iodata for this, not the conda version
-def fchk2dict(fchk):
+def fchk2dict(output_file):
     # probably still some data missing
-    # check job type, for now implement basics (SP=single point, FOpt = full opt, Freq = frequency calculation)
-    if not fchk.command.lower() in ['sp','fopt','freq']:
+    # check job type, for now implement basics (energy=single point, opt = full opt, freq = frequency calculation)
+    fchk = load_one(output_file)
+    if not fchk.run_type in ['energy','opt','freq']:
         raise NotImplementedError
 
     # Basic information
     fchkdict = {}
-    fchkdict['jobtype']     = fchk.command.lower()
+    if fchk.run_type == 'energy':
+        fchkdict['jobtype']     = 'sp'
+    else:
+        fchkdict['jobtype']     = fchk.run_type
     fchkdict['lot']         = fchk.lot
-    fchkdict['basis_set']   = fchk.basis
+    fchkdict['basis_set']   = fchk.obasis_name
 
-    fchkdict['structure/numbers']     = fchk.fields.get('Atomic numbers')
-    fchkdict['structure/masses']      = fchk.fields.get('Real atomic weights')*amu
-    fchkdict['structure/charges']     = fchk.fields.get('Mulliken Charges')
-    fchkdict['structure/dipole']      = fchk.fields.get('Dipole Moment')
-    fchkdict['structure/dft/n_electrons']         = fchk.fields.get('Number of electrons')
-    fchkdict['structure/dft/n_alpha_electrons']   = fchk.fields.get('Number of alpha electrons')
-    fchkdict['structure/dft/n_beta_electrons']    = fchk.fields.get('Number of beta electrons')
-    fchkdict['structure/dft/n_basis_functions']   = fchk.fields.get('Number of basis functions')
+    fchkdict['structure/numbers']     = fchk.atnums
+    fchkdict['structure/masses']      = fchk.atmasses
+    fchkdict['structure/charges']     = fchk.atcharges
+    fchkdict['structure/dipole'] = None
+    for key, item in fchk.moments.items():
+        if key == (1, 'c'): # dipole moment in cartesian coordinates
+            fchkdict['structure/dipole'] = item
+    fchkdict['structure/dft/n_electrons']         = fchk.nelec
+    fchkdict['structure/dft/n_basis_functions']   = len(fchk.mo.coeffs)
 
     # Orbital information
-    fchkdict['structure/dft/alpha_orbital_e']     = fchk.fields.get('Alpha Orbital Energies')
-    fchkdict['structure/dft/beta_orbital_e']      = fchk.fields.get('Beta Orbital Energies')
+    if fchk.mo.kind == 'restricted':
+        fchkdict['structure/dft/alpha_orbital_e'] = fchk.mo.energies
+        fchkdict['structure/dft/beta_orbital_e']  = None
+    elif fchk.mo.kind == 'unrestricted':
+        fchkdict['structure/dft/alpha_orbital_e'] = fchk.mo.energies[:fchk.mo.norba]
+        fchkdict['structure/dft/beta_orbital_e']  = fchk.mo.energies[fchk.mo.norba:]
 
     # Densities
-    fchkdict['structure/dft/scf_density']         = _triangle_to_dense(fchk.fields.get('Total SCF Density'))
-    fchkdict['structure/dft/spin_scf_density']    = _triangle_to_dense(fchk.fields.get('Spin SCF Density'))
+    fchkdict['structure/dft/scf_density']           = fchk.one_rdms["scf"]
+    fchkdict['structure/dft/spin_scf_density']      = fchk.one_rdms["scf_spin"]
+    fchkdict['structure/dft/post_scf_density']      = fchk.one_rdms["post_scf_ao"]
+    fchkdict['structure/dft/post_spin_scf_density'] = fchk.one_rdms["post_scf_spin_ao"]
 
-    if fchk.lot.upper() in ['MP2', 'MP3', 'CC', 'CI']:
-        # only one of the lots should be present, hence using the same key
-        fchkdict['structure/dft/post_scf_density']      = _triangle_to_dense(fchk.fields.get('Total {} Density'.format(fchk.lot)))
-        fchkdict['structure/dft/post_spin_scf_density'] = _triangle_to_dense(fchk.fields.get('Spin {} Density'.format(fchk.lot)))
-
+    fchkdict['structure/positions']   = fchk.atcoords * Bohr
     # Specific job information
-    if fchkdict['jobtype'] == 'fopt':
-        if len(fchk.get_optimization_coordinates().shape) == 3:
-            fchkdict['structure/positions']   = fchk.get_optimization_coordinates()[-1]/angstrom
-        else:
-            fchkdict['structure/positions']   = fchk.get_optimization_coordinates()/angstrom
-        fchkdict['generic/positions']     = fchk.get_optimization_coordinates()/angstrom
-        fchkdict['generic/energy_tot']    = fchk.get_optimization_energies()/electronvolt
-        fchkdict['generic/forces']        = fchk.get_optimization_gradients()/(electronvolt/angstrom) * -1
+    if fchkdict['jobtype'] == 'opt':
+        fchkdict['generic/positions']     = [f.atcoords * Bohr for f in load_many(output_file)]
+        fchkdict['generic/energy_tot']    = [f.energy * Ha for f in load_many(output_file)]
+        fchkdict['generic/forces']        = [f.atgradient * -1 * Ha / Bohr for f in load_many(output_file)]
 
     if fchkdict['jobtype'] == 'freq':
-        fchkdict['structure/positions']   = fchk.fields.get('Current cartesian coordinates').reshape([1,-1, 3])/angstrom
-        fchkdict['generic/positions']     = fchk.fields.get('Current cartesian coordinates').reshape([1,-1, 3])/angstrom
-        fchkdict['generic/forces']        = fchk.fields.get('Cartesian Gradient').reshape([-1, 3])/(electronvolt/angstrom) *-1
-        fchkdict['generic/hessian']       = fchk.get_hessian()/(electronvolt/angstrom**2)
-        fchkdict['generic/energy_tot']    = fchk.fields.get('Total Energy')/electronvolt
+        fchkdict['generic/positions']     = fchk.atcoords * Bohr
+        fchkdict['generic/forces']        = fchk.atgradient * -1 * Ha / Bohr
+        fchkdict['generic/hessian']       = fchk.athessian * Ha / (Bohr**2)
+        fchkdict['generic/energy_tot']    = fchk.energy * Ha
 
     if fchkdict['jobtype'] == 'sp':
-        fchkdict['structure/positions']   = fchk.fields.get('Current cartesian coordinates').reshape([1,-1, 3])/angstrom
-        fchkdict['generic/positions']     = fchk.fields.get('Current cartesian coordinates').reshape([1,-1, 3])/angstrom
-        fchkdict['generic/energy_tot']    = fchk.fields.get('Total Energy')/electronvolt
+        fchkdict['structure/positions']   = fchk.atcoords * Bohr
+        fchkdict['generic/positions']     = fchk.atcoords * Bohr
+        fchkdict['generic/energy_tot']    = fchk.energy * Ha
 
     return fchkdict
 
@@ -587,46 +584,16 @@ def read_EmpiricalDispersion(output_file,output_dict):
 
 
 def collect_output(output_file):
-    # Read output
-    fchk = FCHKFile(output_file)
-
     # Translate to dict
-    output_dict = fchk2dict(fchk)
+    output_dict = fchk2dict(output_file)
 
     # Read BSSE output if it is present
-    read_bsse(output_file,output_dict)
+    read_bsse(output_file, output_dict)
 
     # Correct energy if empirical dispersion contribution is present
-    read_EmpiricalDispersion(output_file,output_dict)
+    read_EmpiricalDispersion(output_file, output_dict)
 
     return output_dict
-
-
-# function from theochem iodata
-def _triangle_to_dense(triangle):
-    """
-    Convert a symmetric matrix in triangular storage to a dense square matrix.
-    Parameters
-    ----------
-    triangle
-        A row vector containing all the unique matrix elements of symmetric
-        matrix. (Either the lower-triangular part in row major-order or the
-        upper-triangular part in column-major order.)
-    Returns
-    -------
-    ndarray
-        a square symmetric matrix.
-    """
-    if triangle is None: return None
-    nrow = int(np.round((np.sqrt(1 + 8 * len(triangle)) - 1) / 2))
-    result = np.zeros((nrow, nrow))
-    begin = 0
-    for irow in range(nrow):
-        end = begin + irow + 1
-        result[irow, :irow + 1] = triangle[begin:end]
-        result[:irow + 1, irow] = triangle[begin:end]
-        begin = end
-    return result
 
 
 def _reverse_readline(filename, buf_size=8192):
