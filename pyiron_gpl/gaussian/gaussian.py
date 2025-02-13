@@ -462,8 +462,8 @@ def fchk2dict(output_file):
     fchkdict['structure/positions']   = fchk.atcoords * Bohr
     # Specific job information
     if fchkdict['jobtype'] == 'opt':
-        fchkdict['generic/indices']       = np.array([np.arange(len(f.atnums)) for f in load_many(output_file)]) # needed for animate_structures, an error is encountered otherwise
-        fchkdict['generic/cell']          = [None for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
+        fchkdict['generic/indices']       = [np.arange(len(f.atnums)) for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
+        fchkdict['generic/cells']         = [None for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
         fchkdict['generic/positions']     = np.array([f.atcoords * Bohr for f in load_many(output_file)])
         fchkdict['generic/energy_tot']    = [f.energy * Ha for f in load_many(output_file)]
         fchkdict['generic/forces']        = np.array([f.atgradient * -1 * Ha / Bohr for f in load_many(output_file)])
