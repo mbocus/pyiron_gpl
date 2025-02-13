@@ -262,7 +262,7 @@ class Gaussian(GenericDFTJob):
             Returns:
                     IR frequencies, intensities and corresponding eigenvectors (modes).
         """
-        assert self.input['jobtype'] == 'freq', "Normal modes available only in a frequency job!" 
+        assert self.input['jobtype'] == 'freq' or self.input['jobtype'] == 'freq(noraman)', "Normal modes available only in a frequency job!" 
         # Read number of atoms
         nrat = len(self.get('output/structure/numbers'))
 
