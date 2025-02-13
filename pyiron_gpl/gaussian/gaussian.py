@@ -294,10 +294,7 @@ class Gaussian(GenericDFTJob):
 
         assert len(freqs) == len(ints), "Number of frequencies and intensities do not match!"
 
-        nma_zeros = 3 * nrat - len(freqs)
-        freq_array = np.zeros(3*nrat)
-        freq_array[:nma_zeros] = np.array(low_freqs[:nma_zeros])
-        freqs[nma_zeros:] = np.array(freqs)
+        freqs = np.array(freqs)
         ints = np.array(ints)
         modes = np.array(modes).reshape(len(ints),nrat,3)
 
