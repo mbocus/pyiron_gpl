@@ -262,6 +262,7 @@ class Gaussian(GenericDFTJob):
             Returns:
                     IR frequencies, intensities and corresponding eigenvectors (modes).
         """
+        assert self.input['jobtype'] == 'freq', "Normal modes available only in a frequency job!" 
         # Read number of atoms
         nrat = len(self.get('output/structure/numbers'))
 
@@ -278,18 +279,20 @@ class Gaussian(GenericDFTJob):
         # Assert normal termination
         assert "Normal termination of Gaussian" in lines[-1]
 
-        # Find zero frequencies
+        # Find frequencies and intensities
         for n in range(len(lines)):
             line = lines[n]
-            if 'Low frequencies' in line:
+            if 'Low frequencies' in line and not low_freqs:
                 low_freqs += [float(i) for i in line[20:].split()]
-            if 'Frequencies --' in line:
-                freqs += [float(i) for i in line[15:].split()]
+            elif 'Low frequencies --' in line and not freqs: # g16 appears to have a bug where Low frequencies is printed twice
+                freqs += [float(i) for i in line[20:].split()]
             if 'IR Inten    --' in line:
                 ints += [float(i) for i in line[15:].split()]
             if 'Atom  AN      X      Y      Z' in line:
                 for m in range(nrat):
                     modes[m] += [float(i) for i in lines[n+m+1][10:].split()]
+
+        assert len(freqs) == len(ints), "Number of frequencies and intensities do not match!"
 
         nma_zeros = 3 * nrat - len(freqs)
         freq_array = np.zeros(3*nrat)
@@ -299,6 +302,31 @@ class Gaussian(GenericDFTJob):
         modes = np.array(modes).reshape(len(ints),nrat,3)
 
         return freqs, ints, modes
+
+    def plot_IR_spectrum(self, width=10, scale=1.0):
+        """
+            Plots the IR spectrum based on the Gaussian output.
+            The peaks in the spectrum are based on Lorentzian widths.
+
+            **Arguments**
+            
+                width (float): width of the Lorentzian peaks
+                scale (float): scaling factor for the frequencies
+        """
+        assert self.input['jobtype'] == 'freq', "Normal modes available only in a frequency job!" 
+        freqs, ints, modes = self.read_NMA()
+        xr = np.arange(0, 4000, 1)
+        alphas = np.zeros(len(xr))
+
+        freqs = freqs * scale
+        for n, (freq, intensity) in enumerate(zip(freqs, ints)):
+            alphas += intensity * 1.0 / (1.0 + ((freq - xr) / (width / 2.0))**2) # lorentzian line shape function
+            
+        fig, ax = pt.subplots()
+        ax.plot(xr, alphas)
+        ax.set_xlabel("Frequency [1/cm]")
+        ax.set_ylabel("Absorption [a.u.]")
+        fig.show()
 
     def bsse_to_pandas(self):
         """
