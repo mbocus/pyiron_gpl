@@ -291,15 +291,14 @@ class Gaussian(GenericDFTJob):
                 for m in range(nrat):
                     modes[m] += [float(i) for i in lines[n+m+1][10:].split()]
 
-        nma_zeros = 3*nrat-len(freqs)
+        nma_zeros = 3 * nrat - len(freqs)
         freq_array = np.zeros(3*nrat)
         freq_array[:nma_zeros] = np.array(low_freqs[:nma_zeros])
-        freq_array[nma_zeros:] = np.array(freqs)
-        freqs = freq_array * (lightspeed/centimeter) # put into atomic units
+        freqs[nma_zeros:] = np.array(freqs)
         ints = np.array(ints)
         modes = np.array(modes).reshape(len(ints),nrat,3)
 
-        return freqs,ints,modes
+        return freqs, ints, modes
 
     def bsse_to_pandas(self):
         """
