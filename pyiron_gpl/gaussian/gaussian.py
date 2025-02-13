@@ -318,7 +318,7 @@ class Gaussian(GenericDFTJob):
         xr = np.arange(0, 4000, 1)
         alphas = np.zeros(len(xr))
 
-        freqs = freqs * scale
+        freqs = np.array(freqs) * scale
         for n, (freq, intensity) in enumerate(zip(freqs, ints)):
             alphas += intensity * 1.0 / (1.0 + ((freq - xr) / (width / 2.0))**2) # lorentzian line shape function
             
