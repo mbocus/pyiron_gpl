@@ -303,19 +303,21 @@ class Gaussian(GenericDFTJob):
 
         return freqs, ints, modes
 
-    def plot_IR_spectrum(self, width=10, scale=1.0):
+    def plot_IR_spectrum(self, width=10, scale=1.0, min_freq=0, max_freq=5000):
         """
             Plots the IR spectrum based on the Gaussian output.
-            The peaks in the spectrum are based on Lorentzian widths.
+            The peaks in the spectrum are arbitrarily based on Lorentzian widths.
 
             **Arguments**
             
                 width (float): width of the Lorentzian peaks
                 scale (float): scaling factor for the frequencies
+                min_freq (float): minimum frequency to plot (inverse cm)
+                max_freq (float): maximum frequency to plot (inverse cm)
         """
         assert self.input['jobtype'] == 'freq' or self.input['jobtype'] == 'freq(noraman)', "Normal modes available only in a frequency job!" 
         freqs, ints, modes = self.read_NMA()
-        xr = np.arange(0, 4000, 1)
+        xr = np.arange(min_freq, max_freq, 1)
         alphas = np.zeros(len(xr))
 
         freqs = np.array(freqs) * scale
