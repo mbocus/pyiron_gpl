@@ -313,7 +313,7 @@ class Gaussian(GenericDFTJob):
                 width (float): width of the Lorentzian peaks
                 scale (float): scaling factor for the frequencies
         """
-        assert self.input['jobtype'] == 'freq', "Normal modes available only in a frequency job!" 
+        assert self.input['jobtype'] == 'freq' or self.input['jobtype'] == 'freq(noraman)', "Normal modes available only in a frequency job!" 
         freqs, ints, modes = self.read_NMA()
         xr = np.arange(0, 4000, 1)
         alphas = np.zeros(len(xr))
