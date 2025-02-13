@@ -459,10 +459,20 @@ def fchk2dict(output_file):
     fchkdict['structure/dft/post_scf_density'] = fchk.one_rdms.get("post_scf_ao", None)
     fchkdict['structure/dft/post_spin_scf_density'] = fchk.one_rdms.get("post_scf_spin_ao", None)
 
+    def _generate_indices(atnums):
+        # indices indicates which atom belongs to which element (e.g. ['O', 'H', 'H'] -> [0, 1, 1])
+        mapping = {}
+        indices = []
+        for atnum in atnums:
+            if atnum not in mapping:
+                mapping[atnum] = len(mapping)
+            indices.append(mapping[atnum])
+        return indices
+
     fchkdict['structure/positions']   = fchk.atcoords * Bohr
     # Specific job information
     if fchkdict['jobtype'] == 'opt':
-        fchkdict['generic/indices']       = [np.arange(len(f.atnums)) for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
+        fchkdict['generic/indices']       = [_generate_indices(f) for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
         fchkdict['generic/cells']         = [None for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
         fchkdict['generic/positions']     = np.array([f.atcoords * Bohr for f in load_many(output_file)])
         fchkdict['generic/energy_tot']    = [f.energy * Ha for f in load_many(output_file)]
