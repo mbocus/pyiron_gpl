@@ -167,17 +167,17 @@ class Gaussian(GenericDFTJob):
         """
 
         n_MO = self.get('output/structure/dft/scf_density').shape[0]
-        for n,index in enumerate(range(n_MO)):
+        for index in range(n_MO):
             # print orbital information
-            occ_alpha = int(self.get('output/structure/dft/n_alpha_electrons') > index)
-            occ_beta = int(self.get('output/structure/dft/n_beta_electrons') > index)
+            occ_alpha = self.get('output/structure/dft/alpha_occupations')[index]
+            occ_beta = self.get('output/structure/dft/beta_occupations')[index]
 
             if self.get('output/structure/dft/beta_orbital_e') is None:
                 orbital_energy = self.get('output/structure/dft/alpha_orbital_e')[index]
-                print("#{}: \t Orbital energy = {:>10.5f} \t Occ. = {}".format(n,orbital_energy,occ_alpha+occ_beta))
+                print("#{}: \t Orbital energy = {:>10.5f} \t Occ. = {}".format(index, orbital_energy, occ_alpha + occ_beta))
             else:
-                orbital_energy = [self.get('output/structure/dft/alpha_orbital_e')[index],self.get('output/structure/dft/beta_orbital_e')[index]]
-                print("#{}: \t Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(n,orbital_energy[0],orbital_energy[1],occ_alpha,occ_beta))
+                orbital_energy = [self.get('output/structure/dft/alpha_orbital_e')[index], self.get('output/structure/dft/beta_orbital_e')[index]]
+                print("#{}: \t Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(index, orbital_energy[0], orbital_energy[1], occ_alpha,occ_beta))
 
     def visualize_MO(self, index, particle_size=0.5, show_bonds=True):
         """
@@ -205,18 +205,15 @@ class Gaussian(GenericDFTJob):
         assert index >= 0 and index < n_MO
         assert len(self.get('output/structure/numbers')) < 50 # check whether structure does not become too large for interactive calculation of cube file
 
-        n_alpha = np.sum(self.get('output/structure/dft/alpha_occupations'))
-        n_beta = np.sum(self.get('output/structure/dft/beta_occupations'))
-
         if self.get('output/structure/dft/beta_orbital_e') is None:
-            occupation = self.get('output/structure/dft/occupations')[index]
+            occ = self.get('output/structure/dft/occupations')[index]
             orbital_energy = self.get('output/structure/dft/alpha_orbital_e')[index]
-            print("Orbital energy = {:>10.5f} \t Occ. = {}".format(orbital_energy, occupation))
+            print("Orbital energy = {:>10.5f} \t Occ. = {}".format(orbital_energy, occ))
         else:
-            occupation_alpha = self.get('output/structure/dft/alpha_occupations')[index]
-            occupation_beta = self.get('output/structure/dft/beta_occupations')[index]
+            occ_alpha = self.get('output/structure/dft/alpha_occupations')[index]
+            occ_beta = self.get('output/structure/dft/beta_occupations')[index]
             orbital_energy = [self.get('output/structure/dft/alpha_orbital_e')[index], self.get('output/structure/dft/beta_orbital_e')[index]]
-            print("Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(orbital_energy[0], orbital_energy[1], occupation_alpha, occupation_beta))
+            print("Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(orbital_energy[0], orbital_energy[1], occ_alpha, occ_beta))
 
         # make cube file
         path = self.path+'_hdf5/'+self.name+'/input'
