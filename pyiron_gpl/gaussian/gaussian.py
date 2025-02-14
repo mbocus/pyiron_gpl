@@ -307,10 +307,13 @@ class Gaussian(GenericDFTJob):
 
             **Arguments**
             
-                width (float): width of the Lorentzian peaks
-                scale (float): scaling factor for the frequencies
-                min_freq (float): minimum frequency to plot (inverse cm)
-                max_freq (float): maximum frequency to plot (inverse cm)
+            width (float): width of the Lorentzian peaks
+
+            scale (float): scaling factor for the frequencies
+
+            min_freq (float): minimum frequency to plot (inverse cm)
+
+            max_freq (float): maximum frequency to plot (inverse cm)
         """
         assert self.input['jobtype'] == 'freq' or self.input['jobtype'] == 'freq(noraman)', "Normal modes available only in a frequency job!" 
         freqs, ints, modes = self.read_NMA()
@@ -326,6 +329,52 @@ class Gaussian(GenericDFTJob):
         ax.set_xlabel("Frequency [1/cm]")
         ax.set_ylabel("Absorption [a.u.]")
         fig.show()
+
+    def animate_nma_mode(self, index, amplitude=1.0, frames=24, spacefill=False, particle_size=0.5):
+        """
+            Visualize the normal mode corresponding to an index
+
+            **Arguments**
+
+            index: index corresponding to a normal mode
+
+            amplitude: size of the deviation of the normal mode
+
+            frames: number of frames that constitute the full mode (lower means faster movement)
+
+            spacefill: remove atom bonds
+
+            particle size: size of the atoms in the structure
+        """
+        assert self.input['jobtype'] == 'freq' or self.input['jobtype'] == 'freq(noraman)', "Normal modes available only in a frequency job!" 
+        freqs, ints, modes = self.read_NMA()
+        print("This mode corresponds to a frequency of {} 1/cm".format(freqs[index]))
+        structure = self.get_structure()
+
+        mode = modes[:, index]
+        if structure.get_masses() is not None:
+            mode /= np.sqrt(structure.get_masses())
+        mode /= np.linalg.norm(mode)
+
+        traj = []
+        for frame in range(frames):
+            _structure = structure.copy()
+            factor = amplitude * np.sin(2 * np.pi * float(frame) / frames)
+            _structure.set_positions(structure.get_positions() + factor * mode.reshape((-1, 3)))
+            traj.append(_structure)
+
+        try:
+            import nglview
+        except ImportError:
+            raise ImportError("The animate_nma_mode() function requires the package nglview to be installed")
+
+        animation = nglview.show_asetraj(traj)
+        if spacefill:
+            animation.add_spacefill(radius_type='vdw', scale=0.5, radius=particle_size)
+            animation.remove_ball_and_stick()
+        else:
+            animation.add_ball_and_stick()
+        return animation
 
     def bsse_to_pandas(self):
         """
