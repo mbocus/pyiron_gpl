@@ -205,21 +205,23 @@ class Gaussian(GenericDFTJob):
         assert index >= 0 and index < n_MO
         assert len(self.get('output/structure/numbers')) < 50 # check whether structure does not become too large for interactive calculation of cube file
 
-        # print orbital information
-        occ_alpha = int(self.get('output/structure/dft/n_alpha_electrons') > index)
-        occ_beta = int(self.get('output/structure/dft/n_beta_electrons') > index)
+        n_alpha = np.sum(self.get('output/structure/dft/alpha_occupations'))
+        n_beta = np.sum(self.get('output/structure/dft/beta_occupations'))
 
         if self.get('output/structure/dft/beta_orbital_e') is None:
+            occupation = self.get('output/structure/dft/occupations')[index]
             orbital_energy = self.get('output/structure/dft/alpha_orbital_e')[index]
-            print("Orbital energy = {:>10.5f} \t Occ. = {}".format(orbital_energy,occ_alpha+occ_beta))
+            print("Orbital energy = {:>10.5f} \t Occ. = {}".format(orbital_energy, occupation))
         else:
-            orbital_energy = [self.get('output/structure/dft/alpha_orbital_e')[index],self.get('output/structure/dft/beta_orbital_e')[index]]
-            print("Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(orbital_energy[0],orbital_energy[1],occ_alpha,occ_beta))
+            occupation_alpha = self.get('output/structure/dft/alpha_occupations')[index]
+            occupation_beta = self.get('output/structure/dft/beta_occupations')[index]
+            orbital_energy = [self.get('output/structure/dft/alpha_orbital_e')[index], self.get('output/structure/dft/beta_orbital_e')[index]]
+            print("Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(orbital_energy[0], orbital_energy[1], occupation_alpha, occupation_beta))
 
         # make cube file
         path = self.path+'_hdf5/'+self.name+'/input'
         out = subprocess.check_output(
-                "ml load Gaussian/g16_E.01-intel-2019a;module use /apps/gent/CO7/haswell-ib/modules/all; cubegen 1 MO={} {}.fchk {}.cube".format(index+1,path,path),
+                "ml load Gaussian/g16_C.02-NVHPC-24.9; cubegen 1 MO={} {}.fchk {}.cube".format(index+1, path,path), # this is at the moment HPC-specific
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
                 shell=True,
@@ -242,9 +244,9 @@ class Gaussian(GenericDFTJob):
             for n in range(n_atoms):
                 line = f.readline().split()
                 atom_numbers.append(int(line[0]))
-                atom_positions.append(np.array([float(m) for m in line[2:]])/angstrom)
+                atom_positions.append(np.array([float(m) for m in line[2:]]) * Bohr) 
 
-        structure = Atoms(numbers=np.array(atom_numbers),positions=atom_positions)
+        structure = Atoms(numbers=np.array(atom_numbers), positions=atom_positions)
         view = nglview.show_ase(structure)
         if not show_bonds:
             view.add_spacefill(radius_type='vdw', scale=0.5, radius=particle_size)
@@ -519,6 +521,9 @@ def fchk2dict(output_file):
             fchkdict['structure/dipole'] = item
     fchkdict['structure/dft/n_electrons']         = fchk.nelec
     fchkdict['structure/dft/n_basis_functions']   = len(fchk.mo.coeffs)
+    fchkdict['structure/dft/occupations']         = fchk.mo.occs
+    fchkdict['structure/dft/alpha_occupations']   = fchk.mo.occsa
+    fchkdict['structure/dft/beta_occupations']    = fchk.mo.occsb
 
     # Orbital information
     if fchk.mo.kind == 'restricted':
