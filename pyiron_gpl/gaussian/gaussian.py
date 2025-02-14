@@ -556,15 +556,15 @@ def fchk2dict(output_file):
     if fchkdict['jobtype'] == 'freq':
         fchkdict['generic/indices']       = [_generate_indices(fchk.atnums)] # needed to get structure in ase format, an error is encountered otherwise
         fchkdict['generic/cells']         = [None] # needed to get structure in ase format, an error is encountered otherwise
-        fchkdict['generic/positions']     = [fchk.atcoords * Bohr] # from a.u. to A
-        fchkdict['generic/forces']        = [fchk.atgradient * -1 * Ha / Bohr] # from a.u. to eV/A
+        fchkdict['generic/positions']     = np.array([fchk.atcoords * Bohr]) # from a.u. to A
+        fchkdict['generic/forces']        = np.array([fchk.atgradient * -1 * Ha / Bohr]) # from a.u. to eV/A
         fchkdict['generic/hessian']       = [fchk.athessian * Ha / (Bohr**2)] # from a.u. to eV/A^2
         fchkdict['generic/energy_tot']    = [fchk.energy * Ha] # from a.u. to eV
 
     if fchkdict['jobtype'] == 'sp':
         fchkdict['generic/indices']       = [_generate_indices(fchk.atnums)] # needed to get structure in ase format, an error is encountered otherwise
         fchkdict['generic/cells']         = [None] # needed to get structure in ase format, an error is encountered otherwise
-        fchkdict['generic/positions']     = [fchk.atcoords * Bohr] # from a.u. to A
+        fchkdict['generic/positions']     = np.array([fchk.atcoords * Bohr]) # from a.u. to A
         fchkdict['generic/energy_tot']    = [fchk.energy * Ha] # from a.u. to eV
 
     return fchkdict
