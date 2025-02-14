@@ -14,7 +14,7 @@ from pyiron_base import GenericParameters
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron_snippets.import_alarm import ImportAlarm
 
-from ase.units import Bohr, Ha
+from ase.units import Bohr, Ha, _me, _amu
 
 try:
     from iodata import load_one, load_many
@@ -511,8 +511,8 @@ def fchk2dict(output_file):
     fchkdict['basis_set']   = fchk.obasis_name
 
     fchkdict['structure/numbers']     = fchk.atnums
-    fchkdict['structure/masses']      = fchk.atmasses
-    fchkdict['structure/charges']     = fchk.atcharges
+    fchkdict['structure/masses']      = fchk.atmasses * _me / _amu # from atomic units to amu
+    fchkdict['structure/charges']     = fchk.atcharges 
     fchkdict['structure/dipole']      = None
     for key, item in fchk.moments.items():
         if key == (1, 'c'): # dipole moment in cartesian coordinates
@@ -544,25 +544,25 @@ def fchk2dict(output_file):
             indices.append(mapping[atnum])
         return indices
 
-    fchkdict['structure/positions']   = fchk.atcoords * Bohr
+    fchkdict['structure/positions']   = fchk.atcoords * Bohr # from a.u. to A
+    fchkdict['generic/indices']       = [_generate_indices(f.atnums) for f in load_many(output_file)] # needed to get structure in ase format, an error is encountered otherwise
+    fchkdict['generic/cells']         = [None for f in load_many(output_file)] # needed to get structure in ase format, an error is encountered otherwise
     # Specific job information
     if fchkdict['jobtype'] == 'opt':
-        fchkdict['generic/indices']       = [_generate_indices(f.atnums) for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
-        fchkdict['generic/cells']         = [None for f in load_many(output_file)] # needed for animate_structures, an error is encountered otherwise
-        fchkdict['generic/positions']     = np.array([f.atcoords * Bohr for f in load_many(output_file)])
-        fchkdict['generic/energy_tot']    = [f.energy * Ha for f in load_many(output_file)]
-        fchkdict['generic/forces']        = np.array([f.atgradient * -1 * Ha / Bohr for f in load_many(output_file)])
+        fchkdict['generic/positions']     = np.array([f.atcoords * Bohr for f in load_many(output_file)]) # from a.u. to A
+        fchkdict['generic/energy_tot']    = [f.energy * Ha for f in load_many(output_file)] # from a.u. to eV
+        fchkdict['generic/forces']        = np.array([f.atgradient * -1 * Ha / Bohr for f in load_many(output_file)]) # from a.u. to eV/A
 
     if fchkdict['jobtype'] == 'freq':
-        fchkdict['generic/positions']     = fchk.atcoords * Bohr
-        fchkdict['generic/forces']        = fchk.atgradient * -1 * Ha / Bohr
-        fchkdict['generic/hessian']       = fchk.athessian * Ha / (Bohr**2)
-        fchkdict['generic/energy_tot']    = fchk.energy * Ha
+        fchkdict['generic/positions']     = fchk.atcoords * Bohr # from a.u. to A
+        fchkdict['generic/forces']        = fchk.atgradient * -1 * Ha / Bohr # from a.u. to eV/A
+        fchkdict['generic/hessian']       = fchk.athessian * Ha / (Bohr**2) # from a.u. to eV/A^2
+        fchkdict['generic/energy_tot']    = fchk.energy * Ha # from a.u. to eV
 
     if fchkdict['jobtype'] == 'sp':
-        fchkdict['structure/positions']   = fchk.atcoords * Bohr
-        fchkdict['generic/positions']     = fchk.atcoords * Bohr
-        fchkdict['generic/energy_tot']    = fchk.energy * Ha
+        fchkdict['structure/positions']   = fchk.atcoords * Bohr # from a.u. to A
+        fchkdict['generic/positions']     = fchk.atcoords * Bohr # from a.u. to A
+        fchkdict['generic/energy_tot']    = fchk.energy * Ha # from a.u. to eV
 
     return fchkdict
 
