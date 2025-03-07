@@ -17,7 +17,7 @@ from pyiron_snippets.import_alarm import ImportAlarm
 from ase.units import Bohr, Ha, _me, _amu
 
 try:
-    from iodata import load_one, load_many
+    from iodata.formats.fchk import load_one, load_many
     import_alarm = ImportAlarm()
 except ImportError:
     import_alarm = ImportAlarm(
@@ -43,6 +43,7 @@ class Gaussian(GenericDFTJob):
         self._executable_activate(enforce=True)
         self.input = GaussianInput()
 
+
     def write_input(self):
         input_dict = {'mem': self.server.memory_limit,
                       'cores': self.server.cores,
@@ -60,11 +61,13 @@ class Gaussian(GenericDFTJob):
                       }
         write_input(input_dict=input_dict, working_directory=self.working_directory)
 
+
     def collect_output(self):
         output_dict = collect_output(output_file=os.path.join(self.working_directory, 'input.fchk'))
         with self.project_hdf5.open("output") as hdf5_output:
             for k, v in output_dict.items():
                 hdf5_output[k] = v
+
 
     def to_hdf(self, hdf=None, group_name=None):
         super(Gaussian, self).to_hdf(hdf=hdf, group_name=group_name)
@@ -72,15 +75,18 @@ class Gaussian(GenericDFTJob):
             self.structure.to_hdf(hdf5_input)
             self.input.to_hdf(hdf5_input)
 
+
     def from_hdf(self, hdf=None, group_name=None):
         super(Gaussian, self).from_hdf(hdf=hdf, group_name=group_name)
         with self.project_hdf5.open("input") as hdf5_input:
             self.input.from_hdf(hdf5_input)
             self.structure = Atoms().from_hdf(hdf5_input)
 
+
     def log(self):
         with open(os.path.join(self.working_directory, 'input.log')) as f:
             print(f.read())
+
 
     def calc_minimize(self, electronic_steps=None, ionic_steps=None, algorithm=None, ionic_forces=None):
         """
@@ -127,6 +133,7 @@ class Gaussian(GenericDFTJob):
             ionic_force_tolerance=ionic_forces
         )
 
+
     def calc_static(self, electronic_steps=None, algorithm=None):
         """
             Function to setup the hamiltonian to perform static SCF DFT runs
@@ -158,8 +165,10 @@ class Gaussian(GenericDFTJob):
             algorithm=algorithm
         )
 
+
     def calc_md(self, temperature=None,  n_ionic_steps=1000, time_step=None, n_print=100):
         raise NotImplementedError("calc_md() not implemented in Gaussian.")
+
 
     def print_MO(self):
         """
@@ -178,6 +187,7 @@ class Gaussian(GenericDFTJob):
             else:
                 orbital_energy = [self.get('output/structure/dft/alpha_orbital_e')[index], self.get('output/structure/dft/beta_orbital_e')[index]]
                 print("#{}: \t Orbital energies (alpha,beta) = {:>10.5f},{:>10.5f} \t Occ. = {},{}".format(index, orbital_energy[0], orbital_energy[1], occ_alpha,occ_beta))
+
 
     def visualize_MO(self, index, particle_size=0.5, show_bonds=True):
         """
@@ -254,6 +264,7 @@ class Gaussian(GenericDFTJob):
         view.add_component('{}.cube'.format(path))
         return view
 
+
     def read_NMA(self):
         """
             Reads the NMA output from the Gaussian .log file.
@@ -299,6 +310,7 @@ class Gaussian(GenericDFTJob):
 
         return freqs, ints, modes
 
+
     def plot_IR_spectrum(self, width=10, scale=1.0, min_freq=0, max_freq=5000):
         """
             Plots the IR spectrum based on the Gaussian output.
@@ -328,6 +340,7 @@ class Gaussian(GenericDFTJob):
         ax.set_xlabel("Frequency [1/cm]")
         ax.set_ylabel("Absorption [a.u.]")
         fig.show()
+
 
     def animate_nma_mode(self, index, amplitude=1.0, frames=24, spacefill=False, particle_size=0.5):
         """
@@ -374,6 +387,7 @@ class Gaussian(GenericDFTJob):
         else:
             animation.add_ball_and_stick()
         return animation
+
 
     def bsse_to_pandas(self):
         """
