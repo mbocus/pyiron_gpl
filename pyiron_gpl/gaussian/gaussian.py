@@ -277,7 +277,6 @@ class Gaussian(GenericDFTJob):
         nrat = len(self.get('output/structure/numbers'))
 
         # Read IR frequencies and intensities from log file
-        low_freqs = []
         freqs = []
         ints = []
         modes = [[] for i in range(nrat)]
@@ -292,15 +291,15 @@ class Gaussian(GenericDFTJob):
         # Find frequencies and intensities
         for n in range(len(lines)):
             line = lines[n]
-            if 'Low frequencies' in line and not low_freqs:
-                low_freqs += [float(i) for i in line[20:].split()]
-            elif 'Low frequencies --' in line and not freqs: # g16 appears to have a bug where Low frequencies is printed twice
+            if 'Frequencies --' in line: 
                 freqs += [float(i) for i in line[20:].split()]
-            if 'IR Inten    --' in line:
+            elif 'IR Inten    --' in line:
                 ints += [float(i) for i in line[15:].split()]
-            if 'Atom  AN      X      Y      Z' in line:
+            elif 'Atom  AN      X      Y      Z' in line:
                 for m in range(nrat):
                     modes[m] += [float(i) for i in lines[n+m+1][10:].split()]
+            else:
+                continue
 
         assert len(freqs) == len(ints), "Number of frequencies and intensities do not match!"
 
