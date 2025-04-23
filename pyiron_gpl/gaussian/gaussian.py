@@ -17,7 +17,7 @@ from pyiron_snippets.import_alarm import ImportAlarm
 from ase.units import Bohr, Ha, _me, _amu
 
 try:
-    from iodata.formats.fchk import load_one, load_many
+    from iodata import load_one, load_many
     import_alarm = ImportAlarm()
 except ImportError:
     import_alarm = ImportAlarm(
@@ -63,7 +63,7 @@ class Gaussian(GenericDFTJob):
 
 
     def collect_output(self):
-        output_dict = collect_output(output_file=os.path.join(self.working_directory, 'input.fchk'))
+        output_dict = _collect_output(output_file=os.path.join(self.working_directory, 'input.fchk'))
         with self.project_hdf5.open("output") as hdf5_output:
             for k, v in output_dict.items():
                 hdf5_output[k] = v
@@ -509,7 +509,7 @@ def write_input(input_dict,working_directory='.'):
 def fchk2dict(output_file):
     # probably still some data missing
     # check job type, for now implement basics (energy=single point, opt = full opt, freq = frequency calculation)
-    fchk = load_one(output_file)
+    fchk = load_one(output_file, fmt='fchk')
     if not fchk.run_type in ['energy','opt','freq']:
         raise NotImplementedError
 
@@ -562,11 +562,19 @@ def fchk2dict(output_file):
     fchkdict['structure/positions']   = [fchk.atcoords * Bohr] # from a.u. to A
     # Specific job information
     if fchkdict['jobtype'] == 'opt':
-        fchkdict['generic/indices']       = [_generate_indices(f.atnums) for f in load_many(output_file)] # needed to get structure in ase format, an error is encountered otherwise
-        fchkdict['generic/cells']         = [None for f in load_many(output_file)] # needed to get structure in ase format, an error is encountered otherwise
-        fchkdict['generic/positions']     = np.array([f.atcoords * Bohr for f in load_many(output_file)]) # from a.u. to A
-        fchkdict['generic/energy_tot']    = [f.energy * Ha for f in load_many(output_file)] # from a.u. to eV
-        fchkdict['generic/forces']        = np.array([f.atgradient * -1 * Ha / Bohr for f in load_many(output_file)]) # from a.u. to eV/A
+        indices, cells, positions, energy_tot, forces = [], [], [], [], []
+        for f in load_many(output_file, fmt='fchk'):
+            indices.append(_generate_indices(f.atnums)) # needed to get structure in ase format, an error is encountered otherwise
+            cells.append(None) # needed to get structure in ase format, an error is encountered otherwise
+            positions.append(f.atcoords * Bohr) # from a.u. to A
+            energy_tot.append(f.energy * Ha) # from a.u. to eV
+            forces.append(f.atgradient * -1 * Ha / Bohr) # from a.u. to eV/A
+
+        fchkdict['generic/indices']       = indices
+        fchkdict['generic/cells']         = cells
+        fchkdict['generic/positions']     = np.array(positions) 
+        fchkdict['generic/energy_tot']    = energy_tot
+        fchkdict['generic/forces']        = np.array(forces)
 
     if fchkdict['jobtype'] == 'freq':
         fchkdict['generic/indices']       = [_generate_indices(fchk.atnums)] # needed to get structure in ase format, an error is encountered otherwise
@@ -688,7 +696,7 @@ def read_EmpiricalDispersion(output_file,output_dict):
     output_dict['generic/energy_tot'] += disp
 
 
-def collect_output(output_file):
+def _collect_output(output_file):
     # Translate to dict
     output_dict = fchk2dict(output_file)
 
