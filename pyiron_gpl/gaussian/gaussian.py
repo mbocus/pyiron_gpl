@@ -443,12 +443,12 @@ class GaussianInput(GenericParameters):
         super(GaussianInput, self).__init__(input_file_name=input_file_name, table_name="input_inp", comment_char="#")
 
     def load_default(self):
-        """
+        '''
         Loading the default settings for the input file.
-        """
+        '''
         input_str = """\
 lot HF
-basis_set sto-3g
+basis_set 6-311G(d,p)
 spin_mult 1
 charge 0
 """
@@ -460,7 +460,7 @@ def write_input(input_dict,working_directory='.'):
     # Load dictionary
     lot          = input_dict['lot']
     basis_set    = input_dict['basis_set']
-    spin_mult    = input_dict['spin_mult']  # 2S+1
+    spin_mult    = input_dict['spin_mult'] # 2S+1
     charge       = input_dict['charge']
     symbols      = input_dict['symbols']
     pos          = input_dict['pos']
@@ -471,7 +471,7 @@ def write_input(input_dict,working_directory='.'):
         mem = input_dict['mem'] + 'B' * (input_dict['mem'][-1]!='B') # check if string ends in bytes
         # convert pmem to mem
         cores = input_dict['cores']
-        nmem = str(int(re.findall("\d+", mem)[0]) * cores)
+        nmem = str((int(re.findall("\d+", mem)[0]) - 100) * cores) # shave off 100MB per core since Gaussian overextends its memory usage
         mem_unit = re.findall("[a-zA-Z]+", mem)[0]
         mem = nmem+mem_unit
     else:
@@ -479,6 +479,8 @@ def write_input(input_dict,working_directory='.'):
 
     if not input_dict['jobtype'] is None:
         jobtype = input_dict['jobtype']
+        if " " in jobtype:
+            warnings.warn('Please refrain from specifying multiple jobtypes or settings in the jobtype. To specify different settings, use the settings dictionary instead.')
     else:
         jobtype = "" # corresponds to sp
 
@@ -492,7 +494,10 @@ def write_input(input_dict,working_directory='.'):
     else:
         settings = {}
 
-    verbosity_dict = {'low': 't', 'normal': 'n', 'high': 'p'}
+    if input_dict['suffix'] is not None:
+        input_dict['suffix'] = input_dict['suffix'].strip() # remove leading and trailing whitespaces
+
+    verbosity_dict={'low':'t','normal':'n','high':'p'}
     if not input_dict['verbosity'] is None:
         verbosity  = input_dict['verbosity']
         if verbosity in verbosity_dict:
@@ -500,24 +505,62 @@ def write_input(input_dict,working_directory='.'):
     else:
         verbosity='n'
 
-    if 'Counterpoise' in settings.keys():
-        if input_dict['bsse_idx'] is None or not len(input_dict['bsse_idx']) == len(pos) : # check if all elements are present for a BSSE calculation
+    settings_keys = [key.lower() for key in settings.keys()]
+    if 'counterpoise' in settings_keys:
+        if input_dict['bsse_idx'] is None or not len(input_dict['bsse_idx'])==len(pos) : # check if all elements are present for a BSSE calculation
             raise ValueError('The Counterpoise setting requires a valid bsse_idx array')
         # Check bsse idx (should start from 1 for Gaussian)
         input_dict['bsse_idx'] = [k - min(input_dict['bsse_idx']) + 1 for k in input_dict['bsse_idx']]
-        # Check if it only contains conseqcutive numbers (sum of set should be n*(n+1)/2)
+        # Check if it only contains consecutive numbers (sum of set should be n*(n+1)/2)
         assert sum(set(input_dict['bsse_idx'])) == (max(input_dict['bsse_idx'])*(max(input_dict['bsse_idx']) + 1))/2
+
+    if 'empiricaldispersion' in settings_keys:
+        if verbosity in ['t','n']:
+            warnings.warn('You can only use the EmpiricalDispersion option with a "high" verbosity. This has been automatically updated.')
+            verbosity = 'p'
+
+    if 'geom' in settings_keys and 'addgic' in settings['geom']:
+        assert input_dict['suffix'] is not None
 
     # Parse settings
     settings_string = ""
     for key,valuelst in settings.items():
         if not isinstance(valuelst, list):
             valuelst = [valuelst]
-        option = key + "({}) ".format(",".join(valuelst))*(len(valuelst) > 0)
+        option = key + "({})".format(",".join([str(v) for v in valuelst]))*(len(valuelst)>0) + ' '
         settings_string += option
 
+    # Spin-orbit check
+    lot_line = "".join(lot.lower().split())
+    if 'spin' in lot_line and not 'nroot' in lot_line:
+        lot_line = lot_line[:-1] + ',nroot=1)' # add the nroot option if it is not given
+
+    # If CAS calculation create suffix
+    if 'cas' in lot_line:
+        if input_dict['suffix'] is None:
+            input_dict['suffix'] = ""
+        else:
+            input_dict['suffix']+= '\n\n' # separation between provided suffix and cas suffix
+
+        if 'nroot' in lot_line:
+            nroot = int(re.search(r'nroot=\s*(\d+)', lot_line).group(1))
+            weights = [np.round(1./nroot,2) for i in range(nroot)]
+            if not sum(weights) == 1:
+                weights[-1] = np.round(1-sum(weights[:-1]),2)
+
+            input_dict['suffix'] += " ".join([str(w) for w in weights])
+            input_dict['suffix'] += '\n\n'
+
+        if 'spin' in lot_line:
+            assert input_dict['spin_orbit_states'] is not None
+            assert len(input_dict['spin_orbit_states']) == 2
+            assert all(isinstance(state, int) for state in input_dict['spin_orbit_states'])
+
+            input_dict['suffix'] += " ".join([str(state) for state in input_dict['spin_orbit_states']])
+            input_dict['suffix'] += '\n\n'
+
     # Write to file
-    route_section = "#{} {}/{} {} {}\n\n".format(verbosity,lot,basis_set,jobtype,settings_string)
+    route_section = "#{} {}/{} {} {}\n\n".format(verbosity,lot_line,basis_set,jobtype,settings_string)
     with open(os.path.join(working_directory, 'input.com'), 'w') as f:
         f.write("%mem={}\n".format(mem))
         f.write("%chk=input.chk\n")
@@ -526,18 +569,23 @@ def write_input(input_dict,working_directory='.'):
 
         if not 'Counterpoise' in settings.keys():
             f.write("{} {}\n".format(charge,spin_mult))
-            for n, p in enumerate(pos):
+            for n,p in enumerate(pos):
                 f.write(" {}\t{: 1.6f}\t{: 1.6f}\t{: 1.6f}\n".format(symbols[n],p[0],p[1],p[2]))
-            f.write('\n\n') # don't know whether this is still necessary in G16
+            f.write('\n')
         else:
             if isinstance(charge,list) and isinstance(spin_mult,list): # for BSSE it is possible to define charge and multiplicity for the fragments separately
                 f.write(" ".join(["{},{}".format(charge[idx],spin_mult[idx]) for idx in range(int(settings['Counterpoise']))])) # first couple is for full system, then every fragment separately
             else:
                 f.write("{} {}\n".format(charge,spin_mult))
 
-            for n, p in enumerate(pos):
+            for n,p in enumerate(pos):
                 f.write(" {}(Fragment={})\t{: 1.6f}\t{: 1.6f}\t{: 1.6f}\n".format(symbols[n],input_dict['bsse_idx'][n],p[0],p[1],p[2]))
-            f.write('\n\n') # don't know whether this is still necessary in G16
+            f.write('\n')
+
+        if input_dict['suffix'] is not None:
+            f.write(input_dict['suffix'])
+        f.write('\n\n')
+
 
 
 def fchk2dict(output_file):
