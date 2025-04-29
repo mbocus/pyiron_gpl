@@ -45,7 +45,7 @@ class Gaussian(GenericDFTJob):
 
 
     def write_input(self):
-        input_dict = {'mem': self.server.memory_limit,
+        input_dict = {'mem': self.server.memory_limit, # per core memory
                       'cores': self.server.cores,
                       'verbosity': self.input['verbosity'],
                       'lot': self.input['lot'],
@@ -55,7 +55,9 @@ class Gaussian(GenericDFTJob):
                       'title' : self.input['title'],
                       'spin_mult': self.input['spin_mult'],
                       'charge': self.input['charge'],
+                      'suffix': self.input['suffix'],
                       'bsse_idx': self.input['bsse_idx'],
+                      'spin_orbit_states': self.input['spin_orbit_states'],
                       'symbols': self.structure.get_chemical_symbols().tolist(),
                       'pos': self.structure.positions
                       }
