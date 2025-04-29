@@ -168,6 +168,40 @@ class Gaussian(GenericDFTJob):
 
     def calc_md(self, temperature=None,  n_ionic_steps=1000, time_step=None, n_print=100):
         raise NotImplementedError("calc_md() not implemented in Gaussian.")
+    
+
+    def calc_scan(self, nsteps, stepsize, ic):
+        '''
+            Function to setup the hamiltonian to perform a relaxed scan job
+            Starting from the initial value of the IC, stepsize is added nstep times
+            to construct a grid for the relaxed scan
+
+            **Arguments**
+
+                nsteps (int)
+                            number of steps
+                stepsize (float)
+                            size of step which is performed nstep times
+                ic (tuple)
+                            see https://gaussian.com/gic/ for a definition of the structural parameters
+                            defined as (kind, [i, j, ...]), where kind equals ('Bond', 'B', 'Dihedral', 'D', ...)
+                            and [i,j,...] is the corresponding list of indices, starting to count from 0
+
+        '''
+        settings = {'geom':['addgic'], 'nosymm':[]}
+        suffix = "Scan(Stepsize={},NStep={}) = {}({})".format(float(stepsize),int(nsteps),ic[0],",".join([str(i+1) for i in ic[1]])) # add 1 since gic starts counting from 1
+
+        self.input['jobtype'] = 'opt'
+
+        if not isinstance(self.input['settings'],dict):
+            self.input['settings'] = settings
+        else:
+            self.input['settings'].update(settings)
+
+        if self.input['suffix'] is not None:
+            self.input['suffix'] += '\n' + suffix
+        else:
+            self.input['suffix'] = suffix
 
 
     def print_MO(self):
