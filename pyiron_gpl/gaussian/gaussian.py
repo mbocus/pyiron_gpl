@@ -9,9 +9,10 @@ import pandas
 import numpy as np
 import matplotlib.pyplot as pt
 
-from pyiron_atomistics.dft.job.generic import GenericDFTJob
 from pyiron_base import GenericParameters
+from pyiron_atomistics.dft.job.generic import GenericDFTJob
 from pyiron_atomistics.atomistics.structure.atoms import Atoms
+from pyiron.atomistics.job.atomistic import Trajectory
 from pyiron_snippets.import_alarm import ImportAlarm
 
 from ase.units import Bohr, Ha, _me, _amu
@@ -438,6 +439,94 @@ class Gaussian(GenericDFTJob):
                 tmp[key] = hdf[key] if isinstance(hdf[key],np.ndarray) else [hdf[key]]
             df = pandas.DataFrame(tmp)
         return df
+    
+
+    def animate_scan(self, index=None, spacefill=True, stride=1, center_of_mass=False, particle_size=0.5, plot_energy=False):
+        '''
+        Animates a scan job. If index is None (default), a trajectory is created using the optimal geometry for
+        every frame of the scan. If index is not None, a trajectory is created for that specific frame index,
+        showing the geometry optimization at that scan frame.
+
+        Set plot_energy=True if you want the corresponding energy plot.
+
+        Args:
+            index (int): index of the frame in the scan trajectory
+            spacefill (bool):
+            stride (int): show animation every stride [::stride]
+                          use value >1 to make animation faster
+                           default=1
+            center_of_mass (list/numpy.ndarray): The center of mass
+
+        Returns:
+            animation: nglview IPython widget
+
+        '''
+        assert self.get('output/jobtype')=='scan'
+
+        if index is None:
+            energies = self.get('output/generic/energy_tot')
+            positions = self.get('output/generic/positions')
+        else:
+            energies = self.get('output/structure/scan/energies/p{}'.format(index))
+            positions = self.get('output/structure/scan/positions/p{}'.format(index))
+
+        if plot_energy:
+            pt.clf()
+            pt.plot(energies,'bo--')
+            if index is None:
+                pt.xlabel('Frame')
+            else:
+                pt.xlabel('Opt steps')
+            pt.ylabel('Total energy [a.u.]')
+            pt.show()
+
+
+        # Create the trajectory object
+        indices = self.output.indices
+        max_pos = np.max(np.max(positions, axis=0), axis=0)
+        max_pos[np.abs(max_pos) < 1e-2] = 10
+        cell = np.eye(3) * max_pos
+        cells = np.array([cell] * len(positions))
+
+        if len(positions) != len(cells):
+            raise ValueError("The positions must have the same length as the cells!")
+
+        trajectory = Trajectory(
+            positions[::stride],
+            self.structure.get_parent_basis(),
+            center_of_mass=center_of_mass,
+            cells=cells[::stride],
+            indices=indices[::stride],
+        )
+
+        try:
+            import nglview
+        except ImportError:
+            raise ImportError(
+                "The animate() function requires the package nglview to be installed"
+            )
+
+        animation = nglview.show_asetraj(trajectory)
+        if spacefill:
+            animation.add_spacefill(radius_type="vdw", scale=0.5, radius=particle_size)
+            animation.remove_ball_and_stick()
+        else:
+            animation.add_ball_and_stick()
+        return animation
+
+
+    def get_scan_structure(self, index, step=-1):
+        '''
+        Return the structure from scan 'index' at optimization step 'frame'
+
+        Args:
+            index (int): index of the frame in the scan trajectory
+            step (int): index of the optimization step in this frame
+        '''
+
+        structure = self.structure.copy()
+        structure.positions = self.get('output/structure/scan/positions/p{}'.format(index))[step]
+        return structure    
 
 
 class GaussianInput(GenericParameters):
