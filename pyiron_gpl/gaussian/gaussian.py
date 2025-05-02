@@ -329,7 +329,7 @@ class Gaussian(GenericDFTJob):
         for n in range(len(lines)):
             line = lines[n]
             if 'Frequencies --' in line: 
-                freqs += [float(i) for i in line[20:].split()]
+                freqs += [float(i) for i in line[15:].split()]
             elif 'IR Inten    --' in line:
                 ints += [float(i) for i in line[15:].split()]
             elif 'Atom  AN      X      Y      Z' in line:
