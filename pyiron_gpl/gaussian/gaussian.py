@@ -683,7 +683,7 @@ def fchk2dict(output_file):
     # probably still some data missing
     # check job type, for now implement basics (energy=single point, opt = full opt, freq = frequency calculation)
     fchk = load_one(output_file, fmt='fchk')
-    if not fchk.run_type in ['energy','opt','freq']:
+    if not fchk.run_type in ['energy', 'opt', 'freq', 'scan']:
         raise NotImplementedError
 
     # Basic information
@@ -749,7 +749,7 @@ def fchk2dict(output_file):
         fchkdict['generic/energy_tot']    = energy_tot
         fchkdict['generic/forces']        = np.array(forces)
 
-    if fchkdict['jobtype'] == 'freq':
+    elif fchkdict['jobtype'] == 'freq':
         fchkdict['generic/indices']       = [_generate_indices(fchk.atnums)] # needed to get structure in ase format, an error is encountered otherwise
         fchkdict['generic/cells']         = [None] # needed to get structure in ase format, an error is encountered otherwise
         fchkdict['generic/positions']     = np.array([fchk.atcoords * Bohr]) # from a.u. to A
@@ -757,12 +757,51 @@ def fchk2dict(output_file):
         fchkdict['generic/hessian']       = [fchk.athessian * Ha / (Bohr**2)] # from a.u. to eV/A^2
         fchkdict['generic/energy_tot']    = [fchk.energy * Ha] # from a.u. to eV
 
-    if fchkdict['jobtype'] == 'sp':
+    elif fchkdict['jobtype'] == 'sp':
         fchkdict['generic/indices']       = [_generate_indices(fchk.atnums)] # needed to get structure in ase format, an error is encountered otherwise
         fchkdict['generic/cells']         = [None] # needed to get structure in ase format, an error is encountered otherwise
         fchkdict['generic/positions']     = np.array([fchk.atcoords * Bohr]) # from a.u. to A
         fchkdict['generic/energy_tot']    = [fchk.energy * Ha] # from a.u. to eV
 
+    elif fchkdict['jobtype'] == 'scan':
+        scan_points = [p for p in load_many(output_file, fmt='fchk')] # this contains all points of the scan including the goemetry optimizations
+
+        # store the separate scan results
+        ipoint = 0
+        scan_indices, scan_cells, scan_positions, scan_energy_tot, scan_forces = [], [], [], [], [] # store scan results
+        for scan_point in scan_points:
+            opt_indices, opt_cells, opt_positions, opt_energy_tot, opt_forces = [], [], [], [], [] # store results of the single optimizations
+            istep = 0
+            while True:
+                if scan_point.extra['nstep'] == istep: # we reach the end of an optimization
+                    scan_indices.append(opt_indices[-1])
+                    scan_cells.append(opt_cells[-1])
+                    scan_positions.append(opt_positions[-1])
+                    scan_energy_tot.append(opt_energy_tot[-1])
+                    scan_forces.append(opt_forces[-1])
+                    
+                    fchkdict['structure/scan/indices/p{}'.format(ipoint)]    = opt_indices
+                    fchkdict['structure/scan/cells/p{}'.format(ipoint)]      = opt_cells
+                    fchkdict['structure/scan/positions/p{}'.format(ipoint)]  = np.array(opt_positions)
+                    fchkdict['structure/scan/energy_tot/p{}'.format(ipoint)] = opt_energy_tot
+                    fchkdict['structure/scan/forces/p{}'.format(ipoint)]     = np.array(opt_forces)
+
+                    ipoint += 1
+                    break
+                opt_indices.append(_generate_indices(scan_point.atnums)) # needed to get structure in ase format, an error is encountered otherwise
+                opt_cells.append(None) # needed to get structure in ase format, an error is encountered otherwise
+                opt_positions.append(scan_point.atcoords * Bohr) # from a.u. to A
+                opt_energy_tot.append(scan_point.energy * Ha) # from a.u. to eV
+                opt_forces.append(scan_point.atgradient * -1 * Ha * Bohr) # from a.u. to eV/A
+                istep += 1
+
+        assert len(scan_indices) == scan_points[-1].extra['npoint']
+        fchkdict['generic/indices']    = scan_indices
+        fchkdict['generic/cells']      = scan_cells
+        fchkdict['generic/positions']  = np.array(scan_positions)
+        fchkdict['generic/energy_tot'] = scan_energy_tot
+        fchkdict['generic/forces']     = np.array(scan_forces)
+        
     return fchkdict
 
 
