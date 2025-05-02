@@ -401,7 +401,7 @@ class Gaussian(GenericDFTJob):
 
         mode = modes[index]
         if structure.get_masses() is not None:
-            mode /= np.sqrt(structure.get_masses())
+            mode /= np.sqrt(structure.get_masses())[:, np.newaxis]
         mode /= np.linalg.norm(mode)
 
         traj = []
