@@ -769,31 +769,29 @@ def fchk2dict(output_file):
         # store the separate scan results
         ipoint = 0
         scan_indices, scan_cells, scan_positions, scan_energy_tot, scan_forces = [], [], [], [], [] # store scan results
+        opt_indices, opt_cells, opt_positions, opt_energy_tot, opt_forces = [], [], [], [], [] # store results of the single optimizations
         for scan_point in scan_points:
-            opt_indices, opt_cells, opt_positions, opt_energy_tot, opt_forces = [], [], [], [], [] # store results of the single optimizations
-            istep = 0
-            while True:
-                if scan_point.extra['nstep'] == istep: # we reach the end of an optimization
-                    scan_indices.append(opt_indices[-1])
-                    scan_cells.append(opt_cells[-1])
-                    scan_positions.append(opt_positions[-1])
-                    scan_energy_tot.append(opt_energy_tot[-1])
-                    scan_forces.append(opt_forces[-1])
-                    
-                    fchkdict['structure/scan/indices/p{}'.format(ipoint)]    = opt_indices
-                    fchkdict['structure/scan/cells/p{}'.format(ipoint)]      = opt_cells
-                    fchkdict['structure/scan/positions/p{}'.format(ipoint)]  = np.array(opt_positions)
-                    fchkdict['structure/scan/energy_tot/p{}'.format(ipoint)] = opt_energy_tot
-                    fchkdict['structure/scan/forces/p{}'.format(ipoint)]     = np.array(opt_forces)
+            opt_indices.append(_generate_indices(scan_point.atnums)) # needed to get structure in ase format, an error is encountered otherwise
+            opt_cells.append(None) # needed to get structure in ase format, an error is encountered otherwise
+            opt_positions.append(scan_point.atcoords * Bohr) # from a.u. to A
+            opt_energy_tot.append(scan_point.energy * Ha) # from a.u. to eV
+            opt_forces.append(scan_point.atgradient * -1 * Ha * Bohr) # from a.u. to eV/A           
 
-                    ipoint += 1
-                    break
-                opt_indices.append(_generate_indices(scan_point.atnums)) # needed to get structure in ase format, an error is encountered otherwise
-                opt_cells.append(None) # needed to get structure in ase format, an error is encountered otherwise
-                opt_positions.append(scan_point.atcoords * Bohr) # from a.u. to A
-                opt_energy_tot.append(scan_point.energy * Ha) # from a.u. to eV
-                opt_forces.append(scan_point.atgradient * -1 * Ha * Bohr) # from a.u. to eV/A
-                istep += 1
+            if scan_point.extra['nstep'] - 1 == scan_point.extra['istep']: # we reach the end of an optimization
+                scan_indices.append(opt_indices[-1])
+                scan_cells.append(opt_cells[-1])
+                scan_positions.append(opt_positions[-1])
+                scan_energy_tot.append(opt_energy_tot[-1])
+                scan_forces.append(opt_forces[-1])
+                
+                ipoint = scan_point.extra['ipoint']
+                fchkdict['structure/scan/indices/p{}'.format(ipoint)]    = opt_indices
+                fchkdict['structure/scan/cells/p{}'.format(ipoint)]      = opt_cells
+                fchkdict['structure/scan/positions/p{}'.format(ipoint)]  = np.array(opt_positions)
+                fchkdict['structure/scan/energy_tot/p{}'.format(ipoint)] = opt_energy_tot
+                fchkdict['structure/scan/forces/p{}'.format(ipoint)]     = np.array(opt_forces)
+
+                opt_indices, opt_cells, opt_positions, opt_energy_tot, opt_forces = [], [], [], [], []
 
         assert len(scan_indices) == scan_points[-1].extra['npoint'], "{} {}".format(len(scan_indices), scan_points[-1].extra['npoint'])
         fchkdict['generic/indices']    = scan_indices
