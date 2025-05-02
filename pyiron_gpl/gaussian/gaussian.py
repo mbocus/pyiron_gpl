@@ -467,7 +467,7 @@ class Gaussian(GenericDFTJob):
             energies = self.get('output/generic/energy_tot')
             positions = self.get('output/generic/positions')
         else:
-            energies = self.get('output/structure/scan/energies/p{}'.format(index))
+            energies = self.get('output/structure/scan/energy_tot/p{}'.format(index))
             positions = self.get('output/structure/scan/positions/p{}'.format(index))
 
         if plot_energy:
