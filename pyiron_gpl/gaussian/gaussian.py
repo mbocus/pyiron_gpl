@@ -342,7 +342,7 @@ class Gaussian(GenericDFTJob):
 
         freqs = np.array(freqs)
         ints = np.array(ints)
-        modes = np.array(modes).reshape(len(ints),nrat,3)
+        modes = np.array(modes).T.reshape(len(ints), 3, nrat).transpose(0, 2, 1) # convert modes in a (N ints, N atoms, 3) array
 
         return freqs, ints, modes
 
