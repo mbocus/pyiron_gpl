@@ -795,7 +795,7 @@ def fchk2dict(output_file):
                 opt_forces.append(scan_point.atgradient * -1 * Ha * Bohr) # from a.u. to eV/A
                 istep += 1
 
-        assert len(scan_indices) == scan_points[-1].extra['npoint']
+        assert len(scan_indices) == scan_points[-1].extra['npoint'], "{} {}".format(len(scan_indices), scan_points[-1].extra['npoint'])
         fchkdict['generic/indices']    = scan_indices
         fchkdict['generic/cells']      = scan_cells
         fchkdict['generic/positions']  = np.array(scan_positions)
