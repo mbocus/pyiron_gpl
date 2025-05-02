@@ -399,7 +399,7 @@ class Gaussian(GenericDFTJob):
         print("This mode corresponds to a frequency of {} 1/cm".format(freqs[index]))
         structure = self.get_structure()
 
-        mode = modes[:, index]
+        mode = modes[index]
         if structure.get_masses() is not None:
             mode /= np.sqrt(structure.get_masses())
         mode /= np.linalg.norm(mode)
