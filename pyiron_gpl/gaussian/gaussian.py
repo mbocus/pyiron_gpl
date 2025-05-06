@@ -15,7 +15,7 @@ from pyiron_atomistics.atomistics.structure.atoms import Atoms
 from pyiron.atomistics.job.atomistic import Trajectory
 from pyiron_snippets.import_alarm import ImportAlarm
 
-from ase.units import Bohr, Ha, _me, _amu
+from ase.units import Bohr, kcal, kJ, Ha, mol, _me, _amu
 
 try:
     from iodata import load_one, load_many
@@ -801,24 +801,47 @@ def fchk2dict(output_file):
     return fchkdict
 
 
-def get_bsse_array(line,it):
+def get_bsse_array(line, it):
     numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
     rx = re.compile(numeric_const_pattern, re.VERBOSE)
 
-    cE_corr = float(rx.findall(line)[0]) * kcalmol/electronvolt
+    cE_corr = float(rx.findall(line)[0]) * (kcal/mol)
     line = next(it) # go to next line
-    cE_raw = float(rx.findall(line)[0]) * kcalmol/electronvolt
+    cE_raw = float(rx.findall(line)[0]) * (kcal/mol)
     line = next(it) # go to next line
-    sum_fragments = float(rx.findall(line)[0])/electronvolt
+    sum_fragments = float(rx.findall(line)[0]) * Ha
     line = next(it) # go to next line
-    bsse_corr = float(rx.findall(line)[0])/electronvolt
+    bsse_corr = float(rx.findall(line)[0]) * Ha
     line = next(it) # go to next line
-    E_tot_corr = float(rx.findall(line)[0])/electronvolt
+    E_tot_corr = float(rx.findall(line)[0]) * Ha
 
-    return E_tot_corr,bsse_corr,sum_fragments,cE_raw,cE_corr
+    return E_tot_corr, bsse_corr, sum_fragments, cE_raw,cE_corr
 
 
-def read_bsse(output_file,output_dict):
+def get_thermochemistry_array(line, it):
+    numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
+    rx = re.compile(numeric_const_pattern, re.VERBOSE)
+
+    sum_el_th_fe = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    sum_el_th_enthalpy = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    sum_el_th_energy = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    sum_el_zp_e = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    th_corr_gibbs_fe = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    th_corr_enthalpy = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    th_corr_energy = float(rx.findall(line)[0]) * Ha
+    line = next(it) # go to next line
+    zp_energy = float(rx.findall(line)[0]) * Ha
+
+    return zp_energy, th_corr_energy, th_corr_enthalpy, th_corr_gibbs_fe, sum_el_zp_e, sum_el_th_energy, sum_el_th_enthalpy, sum_el_th_fe
+
+
+def read_bsse(output_file, output_dict):
     # Check whether the route section contains the Counterpoise setting (if fchk module is update, route section can be loaded from dict)
     cp = False
     with open(output_file,'r') as f:
@@ -872,6 +895,33 @@ def read_bsse(output_file,output_dict):
             output_dict['structure/bsse/complexation_energy_corrected'] = output_dict['structure/bsse/complexation_energy_corrected'][::-1]
 
 
+def read_thermochemistry(output_file,output_dict):
+    # Check whether this is a frequency job
+    if output_dict['jobtype']=='freq':
+        # the log file has the same path and name as the output file aside from the file extension
+        log_file = output_file[:output_file.rfind('.')] + '.log'
+        it = _reverse_readline(log_file)
+        line = next(it)
+
+        found = False
+        while not found:
+            try:
+                line = next(it)
+                if 'Sum of electronic and thermal Free Energies' in line:
+                    zp_energy, th_corr_energy, th_corr_enthalpy, th_corr_gibbs_fe, sum_el_zp_e, sum_el_th_energy, sum_el_th_enthalpy, sum_el_th_fe = get_thermochemistry_array(line, it)
+                    output_dict['structure/thermochemistry/zero_point_energy'] = zp_energy
+                    output_dict['structure/thermochemistry/thermal_correction_energy'] = th_corr_energy
+                    output_dict['structure/thermochemistry/thermal_correction_enthalpy'] = th_corr_enthalpy
+                    output_dict['structure/thermochemistry/thermal_correction_gibbs_free_energy'] = th_corr_gibbs_fe
+                    output_dict['structure/thermochemistry/sum_electronic_zero_point_energy'] = sum_el_zp_e
+                    output_dict['structure/thermochemistry/sum_electronic_thermal_energy'] = sum_el_th_energy
+                    output_dict['structure/thermochemistry/sum_electronic_thermal_enthalpy'] = sum_el_th_enthalpy
+                    output_dict['structure/thermochemistry/sum_electronic_thermal_free_energy'] = sum_el_th_fe
+                    found = True
+            except StopIteration:
+                break
+
+
 def read_EmpiricalDispersion(output_file,output_dict):
     # Get dispersion term from log file if it is there
     # dispersion term is not retrieved from gaussian output in fchk
@@ -898,7 +948,7 @@ def read_EmpiricalDispersion(output_file,output_dict):
     while True:
         line = next(it)
         if search_term in line:
-            disp = float(line[38:-9])/electronvolt # could be changed when new search terms are implemented
+            disp = float(line[38:-9]) # could be changed when new search terms are implemented
             break
 
     output_dict['generic/energy_tot'] += disp
@@ -910,6 +960,9 @@ def _collect_output(output_file):
 
     # Read BSSE output if it is present
     read_bsse(output_file, output_dict)
+
+    # Read thermochemistry section if present
+    read_thermochemistry(output_file, output_dict)
 
     # Correct energy if empirical dispersion contribution is present
     read_EmpiricalDispersion(output_file, output_dict)
