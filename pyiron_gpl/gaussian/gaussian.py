@@ -439,6 +439,22 @@ class Gaussian(GenericDFTJob):
         return df
     
 
+    def thermochemistry_to_pandas(self):
+        '''
+        Convert thermochemistry output to a pandas Dataframe object.
+
+        Returns:
+            pandas.Dataframe: output as dataframe
+        '''
+        assert 'freq' in self.input['jobtype'] # check if there was a freq calculation
+        tmp = {}
+        with self.project_hdf5.open('output/structure/thermochemistry') as hdf:
+            for key in hdf.list_nodes():
+                tmp[key] = hdf[key] if isinstance(hdf[key],np.ndarray) else [hdf[key]]
+            df = pandas.DataFrame(tmp)
+        return df
+    
+
     def animate_scan(self, index=None, spacefill=True, stride=1, center_of_mass=False, particle_size=0.5, plot_energy=False):
         '''
         Animates a scan job. If index is None (default), a trajectory is created using the optimal geometry for
