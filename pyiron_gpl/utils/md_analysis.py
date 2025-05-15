@@ -204,21 +204,28 @@ def plot_velocity_spectrum(job, verticals=None, start=0, end=-1, step=1, bsize=4
 
         Depending on the FFT implementation in numpy, it may be interesting to tune the bsize argument. A power of 2 is typically a good choice.
     """    
+
+    ssize = bsize // 2 + 1 # the length of the spectrum array
+    amplitudes = np.zeros(ssize, float)
+
+    runlength = len(job['output/generic/steps'])
+    _start = start if start > 0 else start + runlength
+    _end = end if end >= 0 else end + runlength
+
     # read velocities
-    velocities = job.content["output/generic/velocities"] * fs # in A/fs
+    velocities = job.content["output/generic/velocities"] # in A/fs
 
     # read timestep
     input_dict = job.content["input/control_inp/data_dict"]
     steps = job.content["output/generic/steps"]
-    timestep = float(input_dict["Value"][input_dict["Parameter"].index("timestep")]) * (steps[1] - steps[0]) # in fs
+    timestep = float(input_dict["Value"][input_dict["Parameter"].index("timestep")]) * (steps[1] * step - steps[0]) # in fs
 
-    ssize = bsize // 2 + 1 # spectrum size
-    current = start
+    
+    current = _start
     stride = step * bsize
     work = np.zeros(bsize, float)
-    freqs = np.arange(ssize) / (timestep * bsize) / fs / invcm # in cm-1
-    amplitudes = np.zeros(ssize, float)
-    while current <= end - stride:
+    freqs = np.arange(ssize) / (timestep * bsize) / fs / invcm # in cm-1    
+    while current <= _end - stride:
         for idx in _iter_indices(velocities, indices):
             work = velocities[(slice(current, current+stride, step),) + idx] 
             amplitudes += abs(np.fft.rfft(work))**2
@@ -236,7 +243,7 @@ def plot_velocity_spectrum(job, verticals=None, start=0, end=-1, step=1, bsize=4
             ax.axvline(verticals[i] + thermo_freq, color='g', ls='--')
             ax.axvline(verticals[i] - thermo_freq, color='g', ls='--')
 
-    ax.set_xlim(0, 3500)
+    #ax.set_xlim(0, 3500)
 
     ax.set_xlabel("Wavenumber [1/cm]")
     ax.set_ylabel("Amplitude")
