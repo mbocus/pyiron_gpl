@@ -218,13 +218,15 @@ def plot_velocity_spectrum(job, verticals=None, start=0, end=-1, step=1, bsize=4
     # read timestep
     input_dict = job.content["input/control_inp/data_dict"]
     steps = job.content["output/generic/steps"]
-    timestep = float(input_dict["Value"][input_dict["Parameter"].index("timestep")]) * (steps[1] * step - steps[0]) # in fs
+    input_dt_fs = float(input_dict["Value"][input_dict["Parameter"].index("timestep")])
+    dump_interval = steps[1] - steps[0]
+    dt_eff = input_dt_fs * dump_interval * step
 
     
     current = _start
     stride = step * bsize
     work = np.zeros(bsize, float)
-    freqs = np.arange(ssize) / (timestep * bsize) / fs / invcm # in cm-1    
+    freqs = np.fft.rfftfreq(bsize, dt_eff) / fs / invcm
     while current <= _end - stride:
         for idx in _iter_indices(velocities, indices):
             work = velocities[(slice(current, current+stride, step),) + idx] 
