@@ -32,7 +32,7 @@ setup(
         'numpy==2.3.3',
         'ase==3.26.0',
         'pyiron_atomistics==0.8.1',
-        'pyiron_snippets==1.0.2',
+        'pyiron_snippets==1.0.1',
         'qc-iodata==v1.0.0a8'
     ],
     cmdclass=versioneer.get_cmdclass(),
