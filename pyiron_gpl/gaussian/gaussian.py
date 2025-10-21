@@ -620,11 +620,6 @@ def write_input(input_dict,working_directory='.'):
         # Check if it only contains consecutive numbers (sum of set should be n*(n+1)/2)
         assert sum(set(input_dict['bsse_idx'])) == (max(input_dict['bsse_idx'])*(max(input_dict['bsse_idx']) + 1))/2
 
-    if 'empiricaldispersion' in settings_keys:
-        if verbosity in ['t','n']:
-            warnings.warn('You can only use the EmpiricalDispersion option with a "high" verbosity. This has been automatically updated.')
-            verbosity = 'p'
-
     if 'geom' in settings_keys and 'addgic' in settings['geom']:
         assert input_dict['suffix'] is not None
 
@@ -939,38 +934,6 @@ def read_thermochemistry(output_file,output_dict):
                 break
 
 
-def read_EmpiricalDispersion(output_file,output_dict):
-    # Get dispersion term from log file if it is there
-    # dispersion term is not retrieved from gaussian output in fchk
-
-    disp = None
-    with open(output_file,'r') as f:
-        while True:
-            line = f.readline()
-            if 'Route' in line:
-                line = f.readline()
-                if 'EmpiricalDispersion' in line:
-                    idx = line.find('EmpiricalDispersion')
-                    if 'GD3' in line[idx:]:
-                        search_term = 'Grimme-D3 Dispersion energy='
-                    else:
-                        raise NotImplementedError
-                else:
-                    return
-                break
-
-    # the log file has the same path and name as the output file aside from the file extension
-    log_file = output_file[:output_file.rfind('.')] + '.log'
-    it = _reverse_readline(log_file)
-    while True:
-        line = next(it)
-        if search_term in line:
-            disp = float(line[38:-9]) # could be changed when new search terms are implemented
-            break
-
-    output_dict['generic/energy_tot'] += disp
-
-
 def _collect_output(output_file):
     # Translate to dict
     output_dict = fchk2dict(output_file)
@@ -980,9 +943,6 @@ def _collect_output(output_file):
 
     # Read thermochemistry section if present
     read_thermochemistry(output_file, output_dict)
-
-    # Correct energy if empirical dispersion contribution is present
-    read_EmpiricalDispersion(output_file, output_dict)
 
     return output_dict
 
