@@ -579,7 +579,7 @@ def write_input(input_dict,working_directory='.'):
         cores = input_dict['cores']
         nmem = str((int(re.findall("\d+", mem)[0]) - 100) * cores) # shave off 100MB per core since Gaussian overextends its memory usage
         mem_unit = re.findall("[a-zA-Z]+", mem)[0]
-        mem = nmem+mem_unit
+        mem = nmem + mem_unit
     else:
         mem = "800MB" # default allocation
 
